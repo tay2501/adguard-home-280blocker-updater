@@ -9,11 +9,11 @@
 #   Optimized for Raspberry Pi (ARM) with SD card protection.
 #
 # Installation:
-#   Script: /usr/local/bin/adguard-280blocker-update (no extension)
+#   Script: /usr/local/bin/adguardhome-280blocker-filter-update (no extension)
 #   Data:   /var/opt/adguardhome/filters/280blocker_domain.txt
 #
 # Usage:
-#   adguard-280blocker-update [-v]
+#   adguardhome-280blocker-filter-update [-v]
 #   -v : Verbose mode (print progress to stdout)
 #
 # Exit Codes:
@@ -61,7 +61,7 @@ error() {
 
   # Log to syslog if available (common on Raspberry Pi)
   if command -v logger >/dev/null 2>&1; then
-    logger -t "adguard-280blocker-update" -p user.error "ERROR: ${msg}"
+    logger -t "adguardhome-280blocker-filter-update" -p user.error "ERROR: ${msg}"
   fi
 }
 
@@ -81,7 +81,7 @@ log_success() {
   local msg="$1"
 
   if command -v logger >/dev/null 2>&1; then
-    logger -t "adguard-280blocker-update" -p user.info "SUCCESS: ${msg}"
+    logger -t "adguardhome-280blocker-filter-update" -p user.info "SUCCESS: ${msg}"
   fi
 
   log "$msg"

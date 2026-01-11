@@ -11,7 +11,7 @@ TEST_DIR := test
 LIB_DIR := lib
 
 # Main script
-MAIN_SCRIPT := $(BIN_DIR)/update_280.sh
+MAIN_SCRIPT := $(BIN_DIR)/adguardhome-280blocker-filter-update.sh
 
 # Colors for output
 COLOR_RESET := \033[0m
@@ -122,22 +122,22 @@ clean: ## Clean up temporary files
 install-script: ## Install script to /usr/local/bin (requires sudo)
 	@echo "$(COLOR_YELLOW)Installing script to /usr/local/bin...$(COLOR_RESET)"
 	@if [ -f "$(MAIN_SCRIPT)" ]; then \
-		sudo install -m 755 $(MAIN_SCRIPT) /usr/local/bin/adguard-280blocker-update; \
+		sudo install -m 755 $(MAIN_SCRIPT) /usr/local/bin/adguardhome-280blocker-filter-update; \
 	else \
-		sudo install -m 755 adguard_home_280blocker_updater.sh /usr/local/bin/adguard-280blocker-update; \
+		sudo install -m 755 adguard_home_280blocker_updater.sh /usr/local/bin/adguardhome-280blocker-filter-update; \
 	fi
-	@echo "$(COLOR_GREEN)Script installed successfully to /usr/local/bin/adguard-280blocker-update$(COLOR_RESET)"
+	@echo "$(COLOR_GREEN)Script installed successfully to /usr/local/bin/adguardhome-280blocker-filter-update$(COLOR_RESET)"
 	@echo "$(COLOR_CYAN)Note: Installed without .sh extension per UNIX convention$(COLOR_RESET)"
 
 .PHONY: uninstall-script
 uninstall-script: ## Uninstall script from /usr/local/bin (requires sudo)
 	@echo "$(COLOR_YELLOW)Uninstalling script from /usr/local/bin...$(COLOR_RESET)"
-	@sudo rm -f /usr/local/bin/adguard-280blocker-update
+	@sudo rm -f /usr/local/bin/adguardhome-280blocker-filter-update
 	@echo "$(COLOR_GREEN)Script uninstalled successfully.$(COLOR_RESET)"
 
 .PHONY: setup-cron
 setup-cron: ## Setup cron job to run daily at 3:00 AM
 	@echo "$(COLOR_YELLOW)Setting up cron job...$(COLOR_RESET)"
-	@echo "0 3 * * * /usr/local/bin/adguard-280blocker-update" | sudo crontab -
+	@echo "0 3 * * * /usr/local/bin/adguardhome-280blocker-filter-update" | sudo crontab -
 	@echo "$(COLOR_GREEN)Cron job installed. Filter list will update daily at 3:00 AM.$(COLOR_RESET)"
 	@echo "$(COLOR_CYAN)Verify with: sudo crontab -l$(COLOR_RESET)"

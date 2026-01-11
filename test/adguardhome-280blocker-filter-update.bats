@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# update_280.bats - bats-core test suite for AdGuard Home 280blocker Updater
+# adguardhome-280blocker-filter-update.bats - bats-core test suite for AdGuard Home 280blocker Updater
 # bats-core v1.13.0 compatible
 #
 # Features tested:
@@ -24,7 +24,7 @@ setup() {
     export TEST_TEMP_DIR
 
     # Script path (relative to test directory)
-    SCRIPT_PATH="${BATS_TEST_DIRNAME}/../bin/update_280.sh"
+    SCRIPT_PATH="${BATS_TEST_DIRNAME}/../bin/adguardhome-280blocker-filter-update.sh"
     export SCRIPT_PATH
 
     # Mock data directory

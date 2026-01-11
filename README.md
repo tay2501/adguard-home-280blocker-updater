@@ -37,7 +37,7 @@ cd adguard-home-280blocker-updater
 sudo make install-script
 
 # または手動でコピー
-sudo install -m 755 bin/update_280.sh /usr/local/bin/adguard-280blocker-update
+sudo install -m 755 bin/adguardhome-280blocker-filter-update.sh /usr/local/bin/adguardhome-280blocker-filter-update
 ```
 
 ### 3. フィルタ保存ディレクトリの作成
@@ -53,7 +53,7 @@ sudo mkdir -p /var/opt/adguardhome/filters
 sudo make setup-cron
 
 # または手動でcrontabに追加
-echo "0 3 * * * /usr/local/bin/adguard-280blocker-update" | sudo crontab -
+echo "0 3 * * * /usr/local/bin/adguardhome-280blocker-filter-update" | sudo crontab -
 ```
 
 ## 📖 Usage
@@ -62,10 +62,10 @@ echo "0 3 * * * /usr/local/bin/adguard-280blocker-update" | sudo crontab -
 
 ```bash
 # 静かに実行（cron向け）
-adguard-280blocker-update
+adguardhome-280blocker-filter-update
 
 # 詳細モード（進捗を表示）
-adguard-280blocker-update -v
+adguardhome-280blocker-filter-update -v
 ```
 
 ### オプション
@@ -93,7 +93,7 @@ adguard-280blocker-update -v
 AdGuard Home設定前に、一度手動でスクリプトを実行してフィルタファイルを作成します:
 
 ```bash
-sudo adguard-280blocker-update -v
+sudo adguardhome-280blocker-filter-update -v
 ```
 
 ## 🔍 Troubleshooting
@@ -128,7 +128,7 @@ sudo mkdir -p /var/opt/adguardhome/filters
 sudo chown $(whoami):$(whoami) /var/opt/adguardhome/filters
 
 # または常にsudoで実行
-sudo adguard-280blocker-update -v
+sudo adguardhome-280blocker-filter-update -v
 ```
 
 #### 3. cron実行時のエラー確認
@@ -137,7 +137,7 @@ cronジョブが正常に動作しているか確認:
 
 ```bash
 # cronログを確認（Debian/Ubuntu）
-sudo grep adguard-280blocker-update /var/log/syslog
+sudo grep adguardhome-280blocker-filter-update /var/log/syslog
 
 # crontabを確認
 sudo crontab -l
@@ -146,7 +146,7 @@ sudo crontab -l
 #### 4. スクリプトが見つからない
 
 ```
-command not found: adguard-280blocker-update
+command not found: adguardhome-280blocker-filter-update
 ```
 
 **原因**: スクリプトが正しくインストールされていない
@@ -154,8 +154,8 @@ command not found: adguard-280blocker-update
 **解決策**:
 ```bash
 # インストール状態を確認
-which adguard-280blocker-update
-ls -la /usr/local/bin/adguard-280blocker-update
+which adguardhome-280blocker-filter-update
+ls -la /usr/local/bin/adguardhome-280blocker-filter-update
 
 # 再インストール
 cd /path/to/adguard-home-280blocker-updater
@@ -169,7 +169,7 @@ sudo make install-script
 sudo make uninstall-script
 
 # cron設定の削除
-sudo crontab -l | grep -v adguard-280blocker-update | sudo crontab -
+sudo crontab -l | grep -v adguardhome-280blocker-filter-update | sudo crontab -
 
 # データディレクトリの削除（オプション）
 sudo rm -rf /var/opt/adguardhome/filters
