@@ -1,3 +1,6 @@
+<a href='https://ko-fi.com/Z8Z31J3LMW' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+<a href="https://www.buymeacoffee.com/tay2501" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 36px !important;width: 130px !important;" ></a>
+
 # AdGuard Home 280blocker Updater
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -163,7 +166,7 @@ adguardhome-280blocker-filter-updater -v
 2. **フィルタ** → **DNS遮断リスト** → **カスタムフィルタを追加**
 3. 以下を設定:
    - **名前**: `280blocker Domain List`
-   - **URL**: `file:///var/opt/adguardhome/filters/280blocker_domain.txt`
+   - **URL**: `file:///var/opt/adguardhome/filters/280blocker_domain_ag.txt`
 4. 保存後、フィルタリストを更新
 
 ### 初回実行

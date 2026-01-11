@@ -10,7 +10,7 @@
 #
 # Installation:
 #   Script: /usr/local/bin/adguardhome-280blocker-filter-update (no extension)
-#   Data:   /var/opt/adguardhome/filters/280blocker_domain.txt
+#   Data:   /var/opt/adguardhome/filters/280blocker_domain_ag.txt
 #
 # Usage:
 #   adguardhome-280blocker-filter-update [-v]
@@ -31,7 +31,7 @@ set -euo pipefail
 # --- Constants & Configuration ---
 # FHS Compliant: Variable data goes to /var/opt
 readonly DATA_DIR="${DATA_DIR:-/var/opt/adguardhome/filters}"
-readonly FILE_NAME="280blocker_domain.txt"
+readonly FILE_NAME="280blocker_domain_ag.txt"
 readonly SAVE_PATH="${DATA_DIR}/${FILE_NAME}"
 
 # Raspberry Pi Optimization: Use tmpfs (/tmp is usually mounted as tmpfs)
