@@ -1,0 +1,151 @@
+name: CI
+
+# Trigger on push to main/develop branches and all pull requests
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  # Allow manual workflow dispatch
+  workflow_dispatch:
+
+# Environment variables
+env:
+  SHELLCHECK_VERSION: stable
+  SHFMT_VERSION: latest
+  BATS_VERSION: latest
+
+jobs:
+  # Job 1: ShellCheck static analysis
+  shellcheck:
+    name: ShellCheck Linting
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@master
+      with:
+        scandir: './bin'
+        severity: info
+        format: tty
+        additional_files: 'test/*.bash'
+
+  # Job 2: Code formatting check
+  format-check:
+    name: Format Check (shfmt)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install shfmt
+      run: |
+        wget -qO- "https://github.com/mvdan/sh/releases/latest/download/shfmt_v3.8.0_linux_amd64" > /usr/local/bin/shfmt
+        chmod +x /usr/local/bin/shfmt
+        shfmt --version
+
+    - name: Check formatting
+      run: |
+        shfmt -d -i 2 -ci -bn bin/ test/ || {
+          echo "❌ Code formatting issues detected!"
+          echo "Run 'make format' to fix formatting."
+          exit 1
+        }
+
+  # Job 3: bats-core tests
+  test:
+    name: bats-core Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Test on multiple Ubuntu versions
+        os: [ubuntu-22.04, ubuntu-20.04]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install bats-core
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bats
+        bats --version
+
+    - name: Run bats tests
+      run: |
+        bats test/
+      continue-on-error: false
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-${{ matrix.os }}
+        path: test/
+        retention-days: 7
+
+  # Job 4: Comprehensive CI (all checks)
+  ci-complete:
+    name: CI Complete
+    needs: [shellcheck, format-check, test]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - name: Check all jobs status
+      run: |
+        if [[ "${{ needs.shellcheck.result }}" != "success" ]] || \
+           [[ "${{ needs.format-check.result }}" != "success" ]] || \
+           [[ "${{ needs.test.result }}" != "success" ]]; then
+          echo "❌ CI pipeline failed. Check individual job logs."
+          exit 1
+        fi
+        echo "✅ All CI checks passed successfully!"
+
+  # Job 5: Release validation (optional, runs on tags)
+  release-check:
+    name: Release Validation
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Validate release tag
+      run: |
+        TAG="${GITHUB_REF#refs/tags/}"
+        echo "Release tag: $TAG"
+
+        # Validate semantic versioning (v1.0.0 format)
+        if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "❌ Invalid tag format. Expected: v1.0.0"
+          exit 1
+        fi
+
+        echo "✅ Release tag is valid: $TAG"
+
+    - name: Run full CI pipeline
+      run: |
+        make ci || {
+          echo "❌ CI pipeline failed for release"
+          exit 1
+        }
+
+# Notification on failure (optional - requires secrets)
+# Uncomment and configure if you want Slack/Discord notifications
+#  notify:
+#    name: Notify on Failure
+#    needs: [ci-complete]
+#    runs-on: ubuntu-latest
+#    if: failure()
+#
+#    steps:
+#    - name: Send notification
+#      run: |
+#        echo "CI failed - notification placeholder"
+#        # Add Slack/Discord webhook here
