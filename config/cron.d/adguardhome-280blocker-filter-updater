@@ -1,0 +1,16 @@
+# AdGuard Home 280blocker Filter Updater - Cron Configuration
+# This file should be deployed to /etc/cron.d/ with permissions 644 root:root
+#
+# Format: minute hour day month weekday user command
+# Note: Filenames in /etc/cron.d/ must not contain dots (.)
+#
+# Schedule: Daily at 3:00 AM JST
+# Output: Redirected to /dev/null (adjust if logging is needed)
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=""
+
+# Run filter update daily at 3:00 AM
+# Note: Output is redirected to /dev/null (script logs to syslog instead)
+0 3 * * * root /usr/local/bin/adguardhome-280blocker-filter-update >/dev/null 2>&1

@@ -1,0 +1,105 @@
+name: ✨ 機能リクエスト (Feature Request)
+description: 新機能の提案 (Suggest a new feature or enhancement)
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+assignees:
+  - tay2501
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 機能リクエストありがとうございます！
+        提案内容を詳しく教えてください。
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: 事前確認 (Prerequisites)
+      description: 機能リクエストの前に、以下を確認してください。
+      options:
+        - label: 既存の Issue で同じ提案がないか検索した
+          required: true
+        - label: README.md で既存機能を確認した
+          required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: カテゴリー (Category)
+      description: どのような種類の機能ですか？
+      options:
+        - 新機能 (New Feature)
+        - 既存機能の改善 (Enhancement)
+        - パフォーマンス改善 (Performance)
+        - ドキュメント改善 (Documentation)
+        - 使いやすさ向上 (Usability)
+        - その他 (Other)
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 解決したい課題 (Problem Statement)
+      description: どのような問題や不便さがありますか？
+      placeholder: |
+        例: 複数のフィルタリスト（280blocker以外）を一括管理したい
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 提案する解決策 (Proposed Solution)
+      description: どのように実装すればいいと思いますか？
+      placeholder: |
+        例: 設定ファイル（YAML/JSON）で複数のフィルタソースを定義できるようにする
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 代替案 (Alternatives Considered)
+      description: 他にどのような方法が考えられますか？
+      placeholder: |
+        例:
+        - コマンドライン引数で複数URLを指定
+        - 環境変数でフィルタソースを切り替え
+    validations:
+      required: false
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: ユースケース (Use Case)
+      description: この機能が必要なシナリオを教えてください。
+      placeholder: |
+        例:
+        - 個人のカスタムブロックリストも同時に管理したい
+        - 会社のポリシーに応じて複数のフィルタセットを切り替えたい
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: 貢献の意思 (Contribution)
+      description: この機能の実装に貢献できますか？
+      options:
+        - label: この機能の実装に協力できる（Pull Request を送る予定）
+        - label: テストやフィードバックで協力できる
+        - label: ドキュメント作成で協力できる
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 追加情報 (Additional Context)
+      description: その他、提案に関する情報があれば記載してください。
+      placeholder: |
+        - 参考になる他のプロジェクトやツール
+        - 図やスクリーンショット
+        - 関連するリンク
+    validations:
+      required: false

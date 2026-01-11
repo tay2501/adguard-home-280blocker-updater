@@ -36,7 +36,9 @@ readonly SAVE_PATH="${DATA_DIR}/${FILE_NAME}"
 
 # Raspberry Pi Optimization: Use tmpfs (/tmp is usually mounted as tmpfs)
 # This protects SD card from excessive writes
-readonly TEMP_FILE=$(mktemp -p /tmp)
+# Note: mktemp automatically respects TMPDIR environment variable
+TEMP_FILE=$(mktemp)
+readonly TEMP_FILE
 
 # Network settings
 readonly CONNECT_TIMEOUT=10
@@ -69,7 +71,7 @@ error() {
 # @arg $1 string Info message
 # @exitcode None
 log() {
-  if [ "$VERBOSE" -eq 1 ]; then
+  if [[ "${VERBOSE}" -eq 1 ]]; then
     echo "[INFO] $1"
   fi
 }
@@ -89,13 +91,15 @@ log_success() {
 
 # @description Cleanup temporary files on exit
 # @exitcode None
+# shellcheck disable=SC2317  # Called via trap
 cleanup() {
-  rm -f "$TEMP_FILE"
+  rm -f "${TEMP_FILE}"
 }
 trap cleanup EXIT
 
 # @description Error trap handler - provides stack trace on failure
 # @exitcode None
+# shellcheck disable=SC2317  # Called via trap
 error_trap() {
   local line_no=$1
   local bash_lineno=${BASH_LINENO[0]}
@@ -103,10 +107,10 @@ error_trap() {
   error "Script failed at line ${line_no} (bash line ${bash_lineno})"
   error "Last command: ${BASH_COMMAND}"
 
-  if [ "$VERBOSE" -eq 1 ]; then
+  if [[ "${VERBOSE}" -eq 1 ]]; then
     echo "[DEBUG] Call stack:" >&2
     local frame=0
-    while caller $frame >&2; do
+    while caller "${frame}" >&2; do
       ((frame++))
     done
   fi

@@ -1,0 +1,61 @@
+[Unit]
+Description=AdGuard Home 280blocker Filter Updater
+Documentation=https://github.com/yourusername/adguard-home-280blocker-updater
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+
+# 1. 【修正】ファイル名を 'updater' に統一 (必須)
+ExecStart=/usr/local/bin/adguardhome-280blocker-filter-updater
+
+# --- Security Hardening (Best Practices) ---
+
+# 権限昇格の禁止
+NoNewPrivileges=true
+# /tmp をこのプロセス専用に隔離 (セキュリティ向上)
+PrivateTmp=true
+# /dev へのアクセスを制限
+PrivateDevices=true
+
+# ファイルシステムを原則「読み取り専用」にする
+ProtectSystem=strict
+ProtectHome=true
+
+# 2. 【重要】書き込み許可パス
+# スクリプトがファイルを保存する場所をここに追加する必要があります。
+# AdGuard Homeのディレクトリに直接書く場合:
+# ReadWritePaths=/opt/AdGuardHome/data/filters
+# Webサーバー公開ディレクトリに置く場合:
+# ReadWritePaths=/var/www/html
+# (一旦コメントアウトしますが、実装時に必要に応じて有効化してください)
+# ReadWritePaths=/var/opt/adguardhome/filters
+
+# カーネル保護
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# ネットワーク制限 (IPv4/IPv6のみ許可)
+RestrictAddressFamilies=AF_INET AF_INET6
+
+# システムコール制限
+# シェルスクリプト(bash, curl, sed等)が使うコールを許可
+SystemCallFilter=@system-service @file-system @network-io
+SystemCallErrorNumber=EPERM
+
+# 特権の制限 (rootでも不要な権限は捨てる)
+# CAP_DAC_OVERRIDE: ファイル権限を無視して書き込む場合に必要
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_CHOWN CAP_FOWNER
+AmbientCapabilities=
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=adguardhome-280blocker-updater
+
+[Install]
+WantedBy=multi-user.target

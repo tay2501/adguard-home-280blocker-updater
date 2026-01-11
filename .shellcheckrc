@@ -6,9 +6,30 @@
 enable=all
 
 # Disable specific checks with justification
+
 # SC2312: Consider invoking this command separately to avoid masking its return value
 #         (Disabled because we intentionally use command substitution in certain contexts)
 disable=SC2312
+
+# SC2250: Prefer ${var} over $var (Google Style Guide recommendation)
+#         While best practice, existing code uses $var for simple cases.
+#         New code should use ${var}. Not enforcing retroactively to avoid massive rewrites.
+disable=SC2250
+
+# SC2248: Prefer quoting even when not strictly necessary
+#         Variables in numeric contexts (e.g., -lt, -eq) are safe without quotes.
+#         Existing code is correct; enforcing this creates noise without value.
+disable=SC2248
+
+# SC2292: Prefer [[ ]] over [ ] for tests (Google Style Guide recommendation)
+#         While [[ ]] is preferred, [ ] is POSIX-compliant and works correctly.
+#         New code should use [[ ]]. Not enforcing retroactively.
+disable=SC2292
+
+# SC2310: Function invoked in 'if' condition disables set -e
+#         This is intentional for download_list retry logic (try next month on failure).
+#         The function design relies on exit code propagation for fallback behavior.
+disable=SC2310
 
 # Set shell dialect to bash (not POSIX sh)
 shell=bash

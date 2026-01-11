@@ -24,7 +24,7 @@ setup() {
     export TEST_TEMP_DIR
 
     # Script path (relative to test directory)
-    SCRIPT_PATH="${BATS_TEST_DIRNAME}/../bin/adguardhome-280blocker-filter-update.sh"
+    SCRIPT_PATH="${BATS_TEST_DIRNAME}/../bin/adguardhome-280blocker-filter-updater.sh"
     export SCRIPT_PATH
 
     # Mock data directory
@@ -169,12 +169,12 @@ teardown() {
 # --- Constants and Configuration Tests ---
 
 @test "Script defines DATA_DIR constant" {
-    run grep -E '^DATA_DIR=' "$SCRIPT_PATH"
+    run grep -E '^readonly DATA_DIR=' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
 @test "Script defines FILE_NAME constant" {
-    run grep -E '^FILE_NAME=' "$SCRIPT_PATH"
+    run grep -E '^readonly FILE_NAME=' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 

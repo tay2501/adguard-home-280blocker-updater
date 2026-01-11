@@ -1,143 +1,211 @@
 # Makefile for AdGuard Home 280blocker Updater
-# Follows Google Shell Style Guide and modern best practices
+# Follows GNU Coding Standards and Google Shell Style Guide
 
 SHELL := /bin/bash
 .SHELLFLAGS := -euo pipefail -c
 .DEFAULT_GOAL := help
 
-# Directories
+# ==========================================
+# GNU Standard Variables
+# ==========================================
+PREFIX ?= /usr/local
+DESTDIR ?=
+
+# Binary installation directory
+bindir := $(PREFIX)/bin
+
+# System directories for cron and systemd
+sysconfdir := /etc
+systemddir := $(sysconfdir)/systemd/system
+
+# ==========================================
+# Project Structure
+# ==========================================
 BIN_DIR := bin
 TEST_DIR := test
 LIB_DIR := lib
+CONFIG_DIR := config
 
-# Main script
-MAIN_SCRIPT := $(BIN_DIR)/adguardhome-280blocker-filter-update.sh
+# Main script config
+SCRIPT_NAME := adguardhome-280blocker-filter-updater
+MAIN_SCRIPT := $(BIN_DIR)/$(SCRIPT_NAME).sh
 
-# Colors for output
+# Configuration sources
+CRON_SRC := $(CONFIG_DIR)/cron.d/adguardhome-280blocker-filter-updater
+SYSTEMD_SERVICE_SRC := $(CONFIG_DIR)/systemd/$(SCRIPT_NAME).service
+SYSTEMD_TIMER_SRC := $(CONFIG_DIR)/systemd/$(SCRIPT_NAME).timer
+
+# Installation destinations
+INSTALL_BIN := $(DESTDIR)$(bindir)/$(SCRIPT_NAME)
+INSTALL_CRON := $(DESTDIR)$(sysconfdir)/cron.d/adguardhome-280blocker-filter-updater
+INSTALL_SYSTEMD_SERVICE := $(DESTDIR)$(systemddir)/$(SCRIPT_NAME).service
+INSTALL_SYSTEMD_TIMER := $(DESTDIR)$(systemddir)/$(SCRIPT_NAME).timer
+
+# ==========================================
+# Terminal Colors
+# ==========================================
 COLOR_RESET := \033[0m
 COLOR_CYAN := \033[36m
 COLOR_GREEN := \033[32m
 COLOR_YELLOW := \033[33m
+COLOR_RED := \033[31m
 
-.PHONY: help
-help: ## Show this help message
-	@echo "$(COLOR_CYAN)AdGuard Home 280blocker Updater - Makefile$(COLOR_RESET)"
-	@echo ""
-	@echo "$(COLOR_GREEN)Available targets:$(COLOR_RESET)"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-20s$(COLOR_RESET) %s\n", $$1, $$2}'
+# ==========================================
+# Standard Targets
+# ==========================================
+
+.PHONY: all
+all: ## Default target: verify script existence (No installation)
+	@printf "$(COLOR_CYAN)AdGuard Home 280blocker Updater$(COLOR_RESET)\n"
+	@if [ -f "$(MAIN_SCRIPT)" ]; then \
+		printf "$(COLOR_GREEN)Main script found: $(MAIN_SCRIPT)$(COLOR_RESET)\n"; \
+		printf "$(COLOR_CYAN)Run 'make install-systemd' (Recommended) or 'make install-cron' to install$(COLOR_RESET)\n"; \
+	else \
+		printf "$(COLOR_RED)Error: $(MAIN_SCRIPT) not found$(COLOR_RESET)\n"; \
+		exit 1; \
+	fi
+
+# ==========================================
+# Installation Targets (Refactored)
+# ==========================================
 
 .PHONY: install
-install: ## Install dependencies (bats-core, shellcheck, shfmt)
-	@echo "$(COLOR_YELLOW)Installing dependencies...$(COLOR_RESET)"
-	@command -v shellcheck >/dev/null || { echo "Installing shellcheck..."; sudo apt-get install -y shellcheck; }
-	@command -v shfmt >/dev/null || { echo "Installing shfmt..."; sudo apt-get install -y shfmt || echo "shfmt not available via apt, please install manually from https://github.com/mvdan/sh"; }
-	@command -v bats >/dev/null || { echo "Installing bats-core..."; sudo apt-get install -y bats; }
-	@echo "$(COLOR_GREEN)Dependencies installed successfully.$(COLOR_RESET)"
+install: install-systemd ## Alias for install-systemd (Recommended)
+
+.PHONY: install-common
+install-common: ## (Internal) Install script binary only
+	@printf "$(COLOR_YELLOW)Installing binary: $(SCRIPT_NAME)...$(COLOR_RESET)\n"
+	@if [ ! -f "$(MAIN_SCRIPT)" ]; then \
+		printf "$(COLOR_RED)Error: $(MAIN_SCRIPT) not found$(COLOR_RESET)\n"; \
+		exit 1; \
+	fi
+	@install -d "$(DESTDIR)$(bindir)"
+	@install -m 755 $(MAIN_SCRIPT) "$(INSTALL_BIN)"
+	@printf "$(COLOR_GREEN)Installed: $(INSTALL_BIN)$(COLOR_RESET)\n"
+
+.PHONY: install-cron
+install-cron: install-common ## Install with Cron (Legacy)
+	@printf "$(COLOR_YELLOW)Setting up Cron job...$(COLOR_RESET)\n"
+	@# Check if Cron source exists
+	@if [ -f "$(CRON_SRC)" ]; then \
+		install -d "$(DESTDIR)$(sysconfdir)/cron.d"; \
+		install -m 644 -o root -g root $(CRON_SRC) "$(INSTALL_CRON)"; \
+		printf "$(COLOR_GREEN)Installed: $(INSTALL_CRON)$(COLOR_RESET)\n"; \
+	else \
+		printf "$(COLOR_RED)Error: Cron source $(CRON_SRC) not found$(COLOR_RESET)\n"; \
+	fi
+	@# Warning if Systemd timer is active
+	@if [ -z "$(DESTDIR)" ] && systemctl is-active --quiet $(SCRIPT_NAME).timer 2>/dev/null; then \
+		printf "$(COLOR_RED)Warning: Systemd timer is also active! You should run 'make uninstall' first.$(COLOR_RESET)\n"; \
+	fi
+	@printf "$(COLOR_GREEN)Installation (Cron) complete!$(COLOR_RESET)\n"
+
+.PHONY: install-systemd
+install-systemd: install-common ## Install with Systemd Timer (Recommended)
+	@printf "$(COLOR_YELLOW)Setting up Systemd Timer...$(COLOR_RESET)\n"
+	@# 1. Check sources
+	@if [ ! -f "$(SYSTEMD_SERVICE_SRC)" ] || [ ! -f "$(SYSTEMD_TIMER_SRC)" ]; then \
+		printf "$(COLOR_RED)Error: Systemd files not found in $(CONFIG_DIR)/systemd/$(COLOR_RESET)\n"; \
+		exit 1; \
+	fi
+	@# 2. Safety: Remove conflicting Cron job if exists
+	@if [ -f "$(INSTALL_CRON)" ]; then \
+		printf "$(COLOR_YELLOW)Removing conflicting Cron job...$(COLOR_RESET)\n"; \
+		rm -f "$(INSTALL_CRON)"; \
+	fi
+	@# 3. Install units
+	@install -d "$(DESTDIR)$(systemddir)"
+	@install -m 644 $(SYSTEMD_SERVICE_SRC) "$(INSTALL_SYSTEMD_SERVICE)"
+	@install -m 644 $(SYSTEMD_TIMER_SRC) "$(INSTALL_SYSTEMD_TIMER)"
+	@printf "$(COLOR_GREEN)Installed: $(INSTALL_SYSTEMD_SERVICE)$(COLOR_RESET)\n"
+	@printf "$(COLOR_GREEN)Installed: $(INSTALL_SYSTEMD_TIMER)$(COLOR_RESET)\n"
+	@# 4. Enable & Start (Only if not packaging)
+	@if [ -z "$(DESTDIR)" ]; then \
+		printf "$(COLOR_YELLOW)Reloading systemd...$(COLOR_RESET)\n"; \
+		sudo systemctl daemon-reload; \
+		sudo systemctl enable --now $(SCRIPT_NAME).timer; \
+		printf "$(COLOR_GREEN)Systemd timer enabled and started!$(COLOR_RESET)\n"; \
+		systemctl list-timers $(SCRIPT_NAME).timer --no-pager; \
+	fi
+
+.PHONY: uninstall
+uninstall: ## Remove all installed files
+	@printf "$(COLOR_YELLOW)Uninstalling $(SCRIPT_NAME)...$(COLOR_RESET)\n"
+	@# Stop Systemd (Only if systemd is running)
+	@if [ -z "$(DESTDIR)" ] && [ -d /run/systemd/system ] && command -v systemctl >/dev/null; then \
+		if systemctl is-active --quiet $(SCRIPT_NAME).timer 2>/dev/null; then \
+			sudo systemctl stop $(SCRIPT_NAME).timer || true; \
+			sudo systemctl disable $(SCRIPT_NAME).timer || true; \
+		fi; \
+	fi
+	@# Remove files
+	@rm -f "$(INSTALL_BIN)"
+	@rm -f "$(INSTALL_CRON)"
+	@rm -f "$(INSTALL_SYSTEMD_SERVICE)"
+	@rm -f "$(INSTALL_SYSTEMD_TIMER)"
+	@# Reload (Only if systemd is running)
+	@if [ -z "$(DESTDIR)" ] && [ -d /run/systemd/system ] && command -v systemctl >/dev/null; then \
+		sudo systemctl daemon-reload || true; \
+	fi
+	@printf "$(COLOR_GREEN)Uninstallation complete.$(COLOR_RESET)\n"
+
+# ==========================================
+# Development & Testing Targets
+# ==========================================
 
 .PHONY: lint
 lint: ## Run ShellCheck static analysis
-	@echo "$(COLOR_YELLOW)Running ShellCheck...$(COLOR_RESET)"
-	@if [ -d "$(BIN_DIR)" ]; then \
-		shellcheck -x $(BIN_DIR)/*.sh; \
+	@printf "$(COLOR_YELLOW)Running ShellCheck...$(COLOR_RESET)\n"
+	@if command -v shellcheck >/dev/null; then \
+		if [ -d "$(BIN_DIR)" ]; then \
+			shellcheck -x $(BIN_DIR)/*.sh; \
+		else \
+			shellcheck -x *.sh; \
+		fi; \
+		printf "$(COLOR_GREEN)ShellCheck passed!$(COLOR_RESET)\n"; \
 	else \
-		shellcheck -x *.sh; \
+		printf "$(COLOR_RED)Error: shellcheck not found.$(COLOR_RESET)\n"; \
+		exit 1; \
 	fi
-	@echo "$(COLOR_GREEN)ShellCheck passed!$(COLOR_RESET)"
 
 .PHONY: format
-format: ## Format scripts with shfmt (Google Style: 2 spaces)
-	@echo "$(COLOR_YELLOW)Formatting shell scripts...$(COLOR_RESET)"
+format: ## Format scripts with shfmt
+	@printf "$(COLOR_YELLOW)Formatting shell scripts...$(COLOR_RESET)\n"
 	@if command -v shfmt >/dev/null; then \
-		if [ -d "$(BIN_DIR)" ]; then \
-			shfmt -l -w -i 2 -ci -bn $(BIN_DIR)/ $(TEST_DIR)/ 2>/dev/null || true; \
-		else \
-			shfmt -l -w -i 2 -ci -bn . 2>/dev/null || true; \
-		fi; \
-		echo "$(COLOR_GREEN)Formatting complete.$(COLOR_RESET)"; \
+		shfmt -l -w -i 2 -ci -bn $(BIN_DIR)/ $(TEST_DIR)/ 2>/dev/null || true; \
+		printf "$(COLOR_GREEN)Formatting complete.$(COLOR_RESET)\n"; \
 	else \
-		echo "$(COLOR_YELLOW)shfmt not found. Skipping format.$(COLOR_RESET)"; \
+		printf "$(COLOR_YELLOW)shfmt not found. Skipping.$(COLOR_RESET)\n"; \
 	fi
 
 .PHONY: format-check
-format-check: ## Check if scripts are properly formatted
-	@echo "$(COLOR_YELLOW)Checking formatting...$(COLOR_RESET)"
+format-check: ## Check formatting
+	@printf "$(COLOR_YELLOW)Checking formatting...$(COLOR_RESET)\n"
 	@if command -v shfmt >/dev/null; then \
-		if [ -d "$(BIN_DIR)" ]; then \
-			shfmt -d -i 2 -ci -bn $(BIN_DIR)/ $(TEST_DIR)/ 2>/dev/null || exit 1; \
-		else \
-			shfmt -d -i 2 -ci -bn . 2>/dev/null || exit 1; \
-		fi; \
-		echo "$(COLOR_GREEN)Formatting check passed!$(COLOR_RESET)"; \
+		shfmt -d -i 2 -ci -bn $(BIN_DIR)/ $(TEST_DIR)/ 2>/dev/null || { \
+			printf "$(COLOR_RED)Formatting issues found. Run 'make format'$(COLOR_RESET)\n"; \
+			exit 1; \
+		}; \
+		printf "$(COLOR_GREEN)Formatting check passed!$(COLOR_RESET)\n"; \
 	else \
-		echo "$(COLOR_YELLOW)shfmt not found. Skipping format check.$(COLOR_RESET)"; \
+		printf "$(COLOR_YELLOW)shfmt not found. Skipping check.$(COLOR_RESET)\n"; \
 	fi
 
 .PHONY: test
 test: ## Run bats-core tests
-	@echo "$(COLOR_YELLOW)Running tests...$(COLOR_RESET)"
+	@printf "$(COLOR_YELLOW)Running tests...$(COLOR_RESET)\n"
 	@if [ -d "$(TEST_DIR)" ] && command -v bats >/dev/null; then \
 		bats $(TEST_DIR)/; \
-		echo "$(COLOR_GREEN)All tests passed!$(COLOR_RESET)"; \
+		printf "$(COLOR_GREEN)All tests passed!$(COLOR_RESET)\n"; \
 	else \
-		echo "$(COLOR_YELLOW)Tests not available yet or bats not installed.$(COLOR_RESET)"; \
-	fi
-
-.PHONY: test-verbose
-test-verbose: ## Run bats-core tests in verbose mode
-	@echo "$(COLOR_YELLOW)Running tests (verbose)...$(COLOR_RESET)"
-	@if [ -d "$(TEST_DIR)" ] && command -v bats >/dev/null; then \
-		bats --verbose-run $(TEST_DIR)/; \
-	else \
-		echo "$(COLOR_YELLOW)Tests not available yet or bats not installed.$(COLOR_RESET)"; \
-	fi
-
-.PHONY: run
-run: ## Run the updater script (verbose mode)
-	@echo "$(COLOR_YELLOW)Running updater script...$(COLOR_RESET)"
-	@if [ -f "$(MAIN_SCRIPT)" ]; then \
-		$(MAIN_SCRIPT) -v; \
-	else \
-		./adguard_home_280blocker_updater.sh -v; \
-	fi
-
-.PHONY: run-quiet
-run-quiet: ## Run the updater script (quiet mode, as in cron)
-	@if [ -f "$(MAIN_SCRIPT)" ]; then \
-		$(MAIN_SCRIPT); \
-	else \
-		./adguard_home_280blocker_updater.sh; \
+		printf "$(COLOR_YELLOW)Tests not available or bats not installed.$(COLOR_RESET)\n"; \
 	fi
 
 .PHONY: ci
-ci: lint format-check test ## Run full CI pipeline (lint + format-check + test)
-	@echo "$(COLOR_GREEN)CI pipeline completed successfully!$(COLOR_RESET)"
+ci: lint format-check test ## Run full CI pipeline
+	@printf "$(COLOR_GREEN)CI pipeline completed successfully!$(COLOR_RESET)\n"
 
-.PHONY: clean
-clean: ## Clean up temporary files
-	@echo "$(COLOR_YELLOW)Cleaning up...$(COLOR_RESET)"
-	@rm -f /tmp/tmp.* 2>/dev/null || true
-	@echo "$(COLOR_GREEN)Cleanup complete.$(COLOR_RESET)"
-
-.PHONY: install-script
-install-script: ## Install script to /usr/local/bin (requires sudo)
-	@echo "$(COLOR_YELLOW)Installing script to /usr/local/bin...$(COLOR_RESET)"
-	@if [ -f "$(MAIN_SCRIPT)" ]; then \
-		sudo install -m 755 $(MAIN_SCRIPT) /usr/local/bin/adguardhome-280blocker-filter-update; \
-	else \
-		sudo install -m 755 adguard_home_280blocker_updater.sh /usr/local/bin/adguardhome-280blocker-filter-update; \
-	fi
-	@echo "$(COLOR_GREEN)Script installed successfully to /usr/local/bin/adguardhome-280blocker-filter-update$(COLOR_RESET)"
-	@echo "$(COLOR_CYAN)Note: Installed without .sh extension per UNIX convention$(COLOR_RESET)"
-
-.PHONY: uninstall-script
-uninstall-script: ## Uninstall script from /usr/local/bin (requires sudo)
-	@echo "$(COLOR_YELLOW)Uninstalling script from /usr/local/bin...$(COLOR_RESET)"
-	@sudo rm -f /usr/local/bin/adguardhome-280blocker-filter-update
-	@echo "$(COLOR_GREEN)Script uninstalled successfully.$(COLOR_RESET)"
-
-.PHONY: setup-cron
-setup-cron: ## Setup cron job to run daily at 3:00 AM
-	@echo "$(COLOR_YELLOW)Setting up cron job...$(COLOR_RESET)"
-	@echo "0 3 * * * /usr/local/bin/adguardhome-280blocker-filter-update" | sudo crontab -
-	@echo "$(COLOR_GREEN)Cron job installed. Filter list will update daily at 3:00 AM.$(COLOR_RESET)"
-	@echo "$(COLOR_CYAN)Verify with: sudo crontab -l$(COLOR_RESET)"
+.PHONY: help
+help: ## Show this help message
+	@printf "$(COLOR_CYAN)AdGuard Home 280blocker Updater - Makefile$(COLOR_RESET)\n"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-20s$(COLOR_RESET) %s\n", $$1, $$2}'

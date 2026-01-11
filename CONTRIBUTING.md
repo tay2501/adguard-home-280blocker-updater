@@ -36,7 +36,7 @@ git clone https://github.com/yourusername/adguard-home-280blocker-updater.git
 cd adguard-home-280blocker-updater
 
 # 開発依存関係のインストール（Debian/Ubuntu/Raspberry Pi OS）
-make install
+make bootstrap
 
 # 手動インストールの場合
 sudo apt-get update
@@ -50,6 +50,38 @@ wget -qO /usr/local/bin/shfmt https://github.com/mvdan/sh/releases/latest/downlo
 chmod +x /usr/local/bin/shfmt
 ```
 
+**Note:** `make install`は本番環境へのインストールコマンドです。開発依存関係のインストールには`make bootstrap`を使用してください。
+
+### Docker開発環境（推奨）
+
+Windows や macOS など、Linux以外の環境で開発する場合は Docker を使用できます：
+
+```bash
+# テスト用 Linux 環境を起動
+docker compose up -d
+
+# コンテナ内でシェルを起動
+docker compose exec lab bash
+
+# コンテナ内で開発作業を実行
+docker compose exec lab make lint
+docker compose exec lab make test
+docker compose exec lab make format
+
+# systemd の動作確認（実環境に近いテスト）
+docker compose exec lab make install-systemd
+docker compose exec lab systemctl status adguardhome-280blocker-filter-updater.timer
+
+# 環境の停止と削除
+docker compose down
+```
+
+**Docker 環境の特徴:**
+- Ubuntu 24.04 LTS ベース
+- systemd 統合済み（実環境に近いテストが可能）
+- 開発ツール（ShellCheck, bats-core, shfmt）プリインストール済み
+- Windows でも systemd や cron の動作確認が可能
+
 ---
 
 ## 📁 Project Structure
@@ -57,29 +89,47 @@ chmod +x /usr/local/bin/shfmt
 ```
 adguard-home-280blocker-updater/
 ├── .github/
-│   └── workflows/
-│       └── ci.yml              # GitHub Actions CI/CD
+│   ├── ISSUE_TEMPLATE/         # Issueテンプレート
+│   ├── workflows/
+│   │   └── ci.yml              # GitHub Actions CI/CD
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── dependabot.yml          # Dependabot設定
 ├── bin/
-│   └── update_280.sh           # メインスクリプト（実行ファイル）
+│   └── adguardhome-280blocker-filter-updater.sh  # メインスクリプト
+├── config/                     # 設定ファイル（NEW）
+│   ├── cron.d/
+│   │   └── adguardhome-280blocker-updater       # cron設定
+│   └── systemd/
+│       ├── adguardhome-280blocker-updater.service
+│       └── adguardhome-280blocker-updater.timer
 ├── lib/                        # 共通ライブラリ（今後の拡張用）
 ├── test/
 │   ├── setup_suite.bash        # テストスイート設定
-│   └── update_280.bats         # bats-core テスト
+│   └── test_*.bats             # bats-core テスト
+├── docs/                       # ドキュメント
+│   ├── ARCHITECTURE.md         # アーキテクチャ設計
+│   └── DEPLOYMENT.md           # デプロイメントガイド
 ├── .editorconfig               # エディタ設定
 ├── .gitignore                  # Git除外設定
 ├── .shellcheckrc               # ShellCheck設定
+├── CHANGELOG.md                # 変更履歴
+├── compose.yaml                # Docker Compose設定（開発用）
 ├── CONTRIBUTING.md             # このファイル（開発者向け）
+├── Dockerfile                  # Docker開発環境（systemd統合）
 ├── LICENSE                     # MITライセンス
-├── Makefile                    # タスクランナー
+├── Makefile                    # GNU標準準拠タスクランナー
 └── README.md                   # 利用者向けドキュメント
 ```
 
 ### ディレクトリの役割
 
 - **bin/**: 実行可能スクリプト（`.sh` 拡張子あり）
+- **config/**: システム設定ファイル（cron, systemd）
+  - `cron.d/`: `/etc/cron.d/`へデプロイされるcron設定
+  - `systemd/`: `/etc/systemd/system/`へデプロイされるユニットファイル
 - **lib/**: 共有ライブラリファイル（`.sh` 拡張子必須、実行不可）
 - **test/**: テストファイル（`.bats` 拡張子）
-- **.github/workflows/**: GitHub Actions CI/CD定義
+- **.github/**: GitHub固有の設定（CI/CD, Issue/PRテンプレート）
 
 ---
 
@@ -87,17 +137,43 @@ adguard-home-280blocker-updater/
 
 ### 利用可能なMakeタスク
 
+Makefileは[GNU Coding Standards](https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html)に準拠しています。
+
+#### GNU標準ターゲット
 ```bash
-make help          # ヘルプを表示
+make all           # デフォルトターゲット（スクリプトの存在確認）
+make install       # 本番環境へインストール（スクリプト + cron設定）
+make install-systemd  # systemd timer方式でインストール
+make uninstall     # 完全アンインストール
+make check         # テスト実行（testのエイリアス）
+make test          # bats-coreテストを実行
+make clean         # 一時ファイルのクリーンアップ
+make distclean     # 全生成ファイルを削除
+```
+
+#### 開発者向けターゲット
+```bash
+make bootstrap     # 開発依存関係のインストール（shellcheck, shfmt, bats）
 make lint          # ShellCheck静的解析
 make format        # shfmtで自動フォーマット
 make format-check  # フォーマットチェック（CIで使用）
-make test          # bats-coreテストを実行
 make test-verbose  # テストを詳細モードで実行
 make ci            # 完全なCIパイプライン実行（lint + format-check + test）
+```
+
+#### ランタイム・ステータス確認
+```bash
 make run           # スクリプトを詳細モードで実行
 make run-quiet     # スクリプトを静かに実行
-make clean         # 一時ファイルのクリーンアップ
+make status        # インストール状態を確認
+make check-cron    # cron設定を確認
+make check-systemd # systemd timer状態を確認
+```
+
+#### 変数のカスタマイズ
+```bash
+make PREFIX=/usr install              # /usr/binにインストール
+make DESTDIR=/tmp/staging install     # ステージング（パッケージング）
 ```
 
 ### 開発サイクル
@@ -329,15 +405,24 @@ Closes #42
 ### 公式ドキュメント
 
 - [Google Shell Style Guide](https://google.github.io/styleguide/shellguide.html)
+- [GNU Coding Standards - Makefile Conventions](https://www.gnu.org/prep/standards/html_node/Makefile-Conventions.html)
+- [GNU Standard Targets](https://www.gnu.org/prep/standards/html_node/Standard-Targets.html)
 - [ShellCheck Wiki](https://www.shellcheck.net/wiki/)
 - [bats-core Documentation](https://bats-core.readthedocs.io/)
 - [UNIX Naming Standards](https://knowledge.businesscompassllc.com/unix-shell-script-naming-and-coding-standards-and-best-practices/)
+
+### システム統合
+
+- [cron.d Best Practices](https://www.tenable.com/audits/items/Tenable_Best_Practices_Cisco_Firepower_Management_Center_OS.audit:e60ebdfb030ed8bfb25007969128ed58)
+- [systemd timers vs cron](https://opensource.com/article/20/7/systemd-timers)
+- [DESTDIR Best Practices](https://www.gnu.org/prep/standards/html_node/DESTDIR.html)
 
 ### 学習リソース
 
 - [ShellCheck Solutions](https://www.hackerone.com/blog/shell-script-pitfalls-and-shellcheck-solutions)
 - [Testing Bash with BATS](https://www.hackerone.com/blog/testing-bash-scripts-bats-practical-guide)
 - [UNIX Philosophy](https://cscie2x.dce.harvard.edu/hw/ch01s06.html)
+- [Makefile Best Practices](https://danyspin97.org/blog/makefiles-best-practices/)
 
 ---
 

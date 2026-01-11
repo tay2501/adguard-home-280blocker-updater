@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/yourusername/adguard-home-280blocker-updater/discussions
+    about: 質問やアイデアの共有はDiscussionsへ (Questions and ideas go to Discussions)
+  - name: 📖 Documentation
+    url: https://github.com/yourusername/adguard-home-280blocker-updater/blob/main/README.md
+    about: README とドキュメントを確認 (Check README and documentation)
+  - name: 🌐 280blocker Website
+    url: https://280blocker.net/
+    about: 280blocker 公式サイト (Official 280blocker website)

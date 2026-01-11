@@ -9,75 +9,104 @@ on:
   # Allow manual workflow dispatch
   workflow_dispatch:
 
+# Cancel in-progress runs for the same workflow and PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # Environment variables
 env:
-  SHELLCHECK_VERSION: stable
-  SHFMT_VERSION: latest
-  BATS_VERSION: latest
+  SHELLCHECK_VERSION: v0.10.0
+  SHFMT_VERSION: v3.10.0
+  BATS_VERSION: 1.11.0
+
+# Default permissions (read-only)
+permissions:
+  contents: read
 
 jobs:
   # Job 1: ShellCheck static analysis
   shellcheck:
     name: ShellCheck Linting
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Run ShellCheck
-      uses: ludeeus/action-shellcheck@master
+      uses: ludeeus/action-shellcheck@v1.1.0
       with:
         scandir: './bin'
         severity: info
         format: tty
-        additional_files: 'test/*.bash'
+        # Scan test files too (bats files are shell scripts)
+        additional_files: 'test/*.bats'
 
   # Job 2: Code formatting check
   format-check:
     name: Format Check (shfmt)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install shfmt
-      run: |
-        wget -qO- "https://github.com/mvdan/sh/releases/latest/download/shfmt_v3.8.0_linux_amd64" > /usr/local/bin/shfmt
-        chmod +x /usr/local/bin/shfmt
-        shfmt --version
+    - name: Setup shfmt
+      uses: mfinelli/setup-shfmt@v3
+      with:
+        shfmt-version: ${{ env.SHFMT_VERSION }}
 
     - name: Check formatting
       run: |
-        shfmt -d -i 2 -ci -bn bin/ test/ || {
+        echo "Checking shell script formatting (Google Style: 2 spaces, -ci -bn)"
+        if ! shfmt -d -i 2 -ci -bn bin/ test/ ; then
+          echo ""
           echo "❌ Code formatting issues detected!"
-          echo "Run 'make format' to fix formatting."
+          echo "💡 Run 'make format' to automatically fix formatting."
           exit 1
-        }
+        fi
+        echo "✅ All scripts are properly formatted."
 
   # Job 3: bats-core tests
   test:
     name: bats-core Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     strategy:
+      fail-fast: false
       matrix:
         # Test on multiple Ubuntu versions
-        os: [ubuntu-22.04, ubuntu-20.04]
+        os: [ubuntu-24.04, ubuntu-22.04]
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Cache apt packages
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt/archives
+        key: ${{ runner.os }}-apt-${{ hashFiles('**/Makefile') }}
+        restore-keys: |
+          ${{ runner.os }}-apt-
+
     - name: Install bats-core
       run: |
         sudo apt-get update
         sudo apt-get install -y bats
-        bats --version
+        echo "bats version: $(bats --version)"
 
     - name: Run bats tests
       run: |
-        bats test/
+        echo "Running bats-core test suite..."
+        bats test/ --verbose-run
       continue-on-error: false
 
     - name: Upload test results
@@ -87,29 +116,43 @@ jobs:
         name: test-results-${{ matrix.os }}
         path: test/
         retention-days: 7
+        if-no-files-found: warn
 
   # Job 4: Comprehensive CI (all checks)
   ci-complete:
     name: CI Complete
     needs: [shellcheck, format-check, test]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     if: always()
 
     steps:
     - name: Check all jobs status
       run: |
+        echo "Checking CI pipeline status..."
+        echo "  - ShellCheck: ${{ needs.shellcheck.result }}"
+        echo "  - Format Check: ${{ needs.format-check.result }}"
+        echo "  - Tests: ${{ needs.test.result }}"
+        echo ""
+
         if [[ "${{ needs.shellcheck.result }}" != "success" ]] || \
            [[ "${{ needs.format-check.result }}" != "success" ]] || \
            [[ "${{ needs.test.result }}" != "success" ]]; then
-          echo "❌ CI pipeline failed. Check individual job logs."
+          echo "❌ CI pipeline failed. Check individual job logs above."
           exit 1
         fi
+
         echo "✅ All CI checks passed successfully!"
 
-  # Job 5: Release validation (optional, runs on tags)
+  # Job 5: Release validation (runs on tags)
   release-check:
     name: Release Validation
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     if: startsWith(github.ref, 'refs/tags/')
 
     steps:
@@ -120,32 +163,40 @@ jobs:
       run: |
         TAG="${GITHUB_REF#refs/tags/}"
         echo "Release tag: $TAG"
+        echo ""
 
         # Validate semantic versioning (v1.0.0 format)
         if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          echo "❌ Invalid tag format. Expected: v1.0.0"
+          echo "❌ Invalid tag format. Expected: vX.Y.Z (e.g., v1.0.0)"
+          echo "   Got: $TAG"
           exit 1
         fi
 
         echo "✅ Release tag is valid: $TAG"
 
+    - name: Cache apt packages
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt/archives
+        key: ${{ runner.os }}-apt-release-${{ hashFiles('**/Makefile') }}
+        restore-keys: |
+          ${{ runner.os }}-apt-
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y shellcheck bats
+
+    - name: Setup shfmt
+      uses: mfinelli/setup-shfmt@v3
+      with:
+        shfmt-version: ${{ env.SHFMT_VERSION }}
+
     - name: Run full CI pipeline
       run: |
+        echo "Running full CI pipeline for release $TAG..."
         make ci || {
           echo "❌ CI pipeline failed for release"
           exit 1
         }
-
-# Notification on failure (optional - requires secrets)
-# Uncomment and configure if you want Slack/Discord notifications
-#  notify:
-#    name: Notify on Failure
-#    needs: [ci-complete]
-#    runs-on: ubuntu-latest
-#    if: failure()
-#
-#    steps:
-#    - name: Send notification
-#      run: |
-#        echo "CI failed - notification placeholder"
-#        # Add Slack/Discord webhook here
+        echo "✅ Release validation passed!"

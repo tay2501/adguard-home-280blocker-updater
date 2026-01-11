@@ -1,0 +1,18 @@
+services:
+  # Systemdテスト用の仮想ラボ
+  lab:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: systemd-test-lab
+    container_name: systemd-lab
+    # Systemdを動かすために必須
+    privileged: true
+    volumes:
+      # ホストのソースコードをマウント
+      - .:/app
+      # Systemdがcgroupを操作するために必須
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    working_dir: /app
+    # 正常なシャットダウンのためのシグナル
+    stop_signal: SIGRTMIN+3
