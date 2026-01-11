@@ -1,0 +1,22 @@
+# .shellcheckrc - ShellCheck Configuration
+# https://www.shellcheck.net/
+# https://github.com/koalaman/shellcheck
+
+# Enable all optional checks for maximum code quality
+enable=all
+
+# Disable specific checks with justification
+# SC2312: Consider invoking this command separately to avoid masking its return value
+#         (Disabled because we intentionally use command substitution in certain contexts)
+disable=SC2312
+
+# Set shell dialect to bash (not POSIX sh)
+shell=bash
+
+# External sources configuration
+# Allow shellcheck to follow source statements
+external-sources=true
+
+# Source path for resolving sourced files
+# SCRIPTDIR = directory of the script being checked
+source-path=SCRIPTDIR
