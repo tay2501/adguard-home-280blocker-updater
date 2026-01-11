@@ -33,6 +33,29 @@ AdGuard Home用の280blockerフィルタリストを自動更新するシェル�
 - **shfmt**: シェルスクリプトフォーマッター
 - **bats-core**: テストフレームワーク
 
+## 📝 Naming Convention
+
+このプロジェクトは **UNIX/Linux命名規約** に準拠しています:
+
+### ファイル拡張子
+
+- **開発中のソースファイル**: `bin/update_280.sh` (`.sh` 拡張子あり)
+- **インストール後の実行ファイル**: `/usr/local/bin/adguard-280blocker-update` (拡張子なし)
+
+[Google Shell Style Guide](https://google.github.io/styleguide/shellguide.html) によると:
+
+> "If the executable will be added directly to the user's PATH, then **prefer to use no extension**. It is not necessary to know what language a program is written in when executing it."
+
+### コマンド名の構成
+
+コマンド名 `adguard-280blocker-update` は以下のUNIXベストプラクティスに従っています:
+
+1. **ハイフン区切り**: UNIX伝統（例: `apt-get`, `docker-compose`, `git-log`）
+2. **説明的**: 何をするかが即座に理解可能（[Rule of Clarity](https://cscie2x.dce.harvard.edu/hw/ch01s06.html): "clarity is better than cleverness"）
+3. **ドメイン明示**: `adguard` + `280blocker` + `update` で文脈が完全に明確
+
+参考: [UNIX Command Naming Standards](https://knowledge.businesscompassllc.com/unix-shell-script-naming-and-coding-standards-and-best-practices/)
+
 ## 🚀 Installation
 
 ### クイックインストール
@@ -56,7 +79,7 @@ sudo mkdir -p /var/opt/adguardhome/filters
 sudo make setup-cron
 
 # 手動でcrontabに追加する場合
-echo "0 3 * * * /usr/local/bin/update_280.sh" | sudo crontab -
+echo "0 3 * * * /usr/local/bin/adguard-280blocker-update" | sudo crontab -
 ```
 
 ### AdGuard Home設定
@@ -74,10 +97,10 @@ echo "0 3 * * * /usr/local/bin/update_280.sh" | sudo crontab -
 
 ```bash
 # 静かに実行（cron向け）
-/usr/local/bin/update_280.sh
+/usr/local/bin/adguard-280blocker-update
 
 # 詳細モード（進捗を表示）
-/usr/local/bin/update_280.sh -v
+/usr/local/bin/adguard-280blocker-update -v
 
 # Makefile経由で実行
 make run         # 詳細モード
@@ -173,7 +196,7 @@ adguard-home-280blocker-updater/
 export DATA_DIR="/custom/path/to/filters"
 
 # スクリプト実行
-DATA_DIR="/custom/path" /usr/local/bin/update_280.sh -v
+DATA_DIR="/custom/path" /usr/local/bin/adguard-280blocker-update -v
 ```
 
 ### デフォルト設定
