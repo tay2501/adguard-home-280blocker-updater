@@ -1,281 +1,203 @@
 #!/bin/bash
 
 # ==============================================================================
-# 280blocker Updater for AdGuard Home
+# AdGuard Home 280blocker Filter Updater
 #
 # Description:
 #   Downloads the monthly adblock filter from 280blocker.net.
-#   Designed to be run via cron. Follows "Silence is Golden" rule.
-#   Optimized for Raspberry Pi (ARM) with SD card protection.
+#   Designed for Raspberry Pi (SD Card protection) and AdGuard Home.
 #
-# Installation:
-#   Script: /usr/local/bin/adguardhome-280blocker-filter-update (no extension)
-#   Data:   /var/opt/adguardhome/filters/280blocker_domain_ag.txt
-#
-# Usage:
-#   adguardhome-280blocker-filter-update [-v]
-#   -v : Verbose mode (print progress to stdout)
-#
-# Exit Codes:
-#   0 : Success (filter updated or no changes detected)
-#   1 : Failure (download error, network issue, etc.)
-#
-# References:
-#   - Google Shell Style Guide: https://google.github.io/styleguide/shellguide.html
-#   - 280blocker: https://280blocker.net/
+# Standards:
+#   - Google Shell Style Guide compliant
+#   - FHS (Filesystem Hierarchy Standard) compliant
+#   - Silence is Golden (for Cron/Systemd)
 # ==============================================================================
 
 # Bash Strict Mode
 set -euo pipefail
+IFS=$'\n\t'
 
 # --- Constants & Configuration ---
-# FHS Compliant: Variable data goes to /var/opt
+readonly SCRIPT_NAME="adguardhome-280blocker-filter-updater"
 readonly DATA_DIR="${DATA_DIR:-/var/opt/adguardhome/filters}"
 readonly FILE_NAME="280blocker_domain_ag.txt"
 readonly SAVE_PATH="${DATA_DIR}/${FILE_NAME}"
-
-# Raspberry Pi Optimization: Use tmpfs (/tmp is usually mounted as tmpfs)
-# This protects SD card from excessive writes
-# Note: mktemp automatically respects TMPDIR environment variable
-TEMP_FILE=$(mktemp)
-readonly TEMP_FILE
 
 # Network settings
 readonly CONNECT_TIMEOUT=10
 readonly MAX_TIMEOUT=30
 readonly MAX_RETRIES=3
 readonly RETRY_DELAY=5
-
-# Minimum valid file size (bytes) - filter lists should be > 100 bytes
 readonly MIN_FILE_SIZE=100
 
-# Verbose flag
+# State variables
 VERBOSE=0
 
 # --- Helper Functions ---
 
-# @description Print error message to stderr and optionally to syslog
+# @description Print message to stderr and syslog
 # @arg $1 string Error message
-# @exitcode None (does not exit)
-error() {
-  local msg="$1"
-  echo "[ERROR] ${msg}" >&2
-
-  # Log to syslog if available (common on Raspberry Pi)
+err() {
+  local msg="[ERROR] $1"
+  printf '%s\n' "${msg}" >&2
   if command -v logger >/dev/null 2>&1; then
-    logger -t "adguardhome-280blocker-filter-update" -p user.error "ERROR: ${msg}"
+    logger -t "${SCRIPT_NAME}" -p user.err "${msg}"
   fi
 }
 
-# @description Print info message to stdout in verbose mode
-# @arg $1 string Info message
-# @exitcode None
-log() {
+# @description Print info message to stdout if verbose mode is on
+# @arg $1 string Message
+info() {
   if [[ "${VERBOSE}" -eq 1 ]]; then
-    echo "[INFO] $1"
+    printf '[INFO] %s\n' "$1"
   fi
 }
 
-# @description Log successful operations to syslog
-# @arg $1 string Success message
-# @exitcode None
+# @description Log success to syslog and stdout
+# @arg $1 string Message
 log_success() {
-  local msg="$1"
-
+  local msg="SUCCESS: $1"
   if command -v logger >/dev/null 2>&1; then
-    logger -t "adguardhome-280blocker-filter-update" -p user.info "SUCCESS: ${msg}"
+    logger -t "${SCRIPT_NAME}" -p user.info "${msg}"
   fi
-
-  log "$msg"
+  info "$msg"
 }
 
-# @description Cleanup temporary files on exit
-# @exitcode None
-# shellcheck disable=SC2317  # Called via trap
+# @description Cleanup temporary files
 cleanup() {
-  rm -f "${TEMP_FILE}"
+  if [[ -n "${TEMP_FILE:-}" && -f "${TEMP_FILE}" ]]; then
+    rm -f "${TEMP_FILE}"
+  fi
 }
 trap cleanup EXIT
 
-# @description Error trap handler - provides stack trace on failure
-# @exitcode None
-# shellcheck disable=SC2317  # Called via trap
+# @description Provide debug info on error
 error_trap() {
+  local res=$?
   local line_no=$1
-  local bash_lineno=${BASH_LINENO[0]}
-
-  error "Script failed at line ${line_no} (bash line ${bash_lineno})"
-  error "Last command: ${BASH_COMMAND}"
-
-  if [[ "${VERBOSE}" -eq 1 ]]; then
-    echo "[DEBUG] Call stack:" >&2
-    local frame=0
-    while caller "${frame}" >&2; do
-      ((frame++))
-    done
-  fi
+  err "Command '${BASH_COMMAND}' failed at line ${line_no} with exit code ${res}"
 }
 trap 'error_trap ${LINENO}' ERR
 
-# @description Print usage information
-# @exitcode 1
-usage() {
-  cat >&2 <<EOF
-Usage: $0 [-v]
+# --- Logic Functions ---
 
-Options:
-  -v    Verbose mode (print progress to stdout)
-
-Examples:
-  $0           # Run quietly (suitable for cron)
-  $0 -v        # Run with verbose output
-
-Exit Codes:
-  0    Success (filter updated or no changes)
-  1    Failure (download error, network issue)
-EOF
-  exit 1
-}
-
-# @description Download filter list from 280blocker.net with retry logic
+# @description Download filter list with retry logic
 # @arg $1 string Target date in YYYYMM format
-# @return 0 on success, 1 on failure
-# @exitcode 0 if download successful, 1 otherwise
-download_list() {
+download_filter() {
   local target_date="$1"
   local url="https://280blocker.net/files/280blocker_domain_ag_${target_date}.txt"
-
-  log "Attempting download from: ${url}"
-
-  # Retry loop for unstable networks (e.g., Raspberry Pi on WiFi)
   local attempt=1
-  while [ $attempt -le $MAX_RETRIES ]; do
-    log "Download attempt ${attempt}/${MAX_RETRIES}"
 
-    # curl options:
-    # -f: Fail on HTTP errors
-    # -s: Silent mode
-    # -S: Show errors even in silent mode
-    # -L: Follow redirects
-    # --connect-timeout: Connection timeout
-    # --max-time: Maximum time for the entire operation
+  info "Fetching from: ${url}"
+
+  while (( attempt <= MAX_RETRIES )); do
+    info "Attempt ${attempt}/${MAX_RETRIES}"
+
     if curl -fsSL \
-      --connect-timeout "$CONNECT_TIMEOUT" \
-      --max-time "$MAX_TIMEOUT" \
-      -o "$TEMP_FILE" \
-      "$url"; then
+      --connect-timeout "${CONNECT_TIMEOUT}" \
+      --max-time "${MAX_TIMEOUT}" \
+      -o "${TEMP_FILE}" \
+      "${url}"; then
 
-      # Validation 1: File must not be empty
-      if [ ! -s "$TEMP_FILE" ]; then
-        log "Downloaded file is empty"
-      # Validation 2: File must not be HTML error page
-      elif grep -q "<!DOCTYPE html>" "$TEMP_FILE" 2>/dev/null; then
-        log "Downloaded file appears to be HTML error page"
-      # Validation 3: File must meet minimum size requirement
+      # Validation: Basic file sanity checks
+      if [[ ! -s "${TEMP_FILE}" ]]; then
+        info "Download successful but file is empty."
+      elif grep -q "<!DOCTYPE html>" "${TEMP_FILE}" 2>/dev/null; then
+        info "Downloaded file is an HTML error page."
       else
-        local file_size
-        # BSD stat (macOS) vs GNU stat (Linux)
-        file_size=$(stat -f%z "$TEMP_FILE" 2>/dev/null || stat -c%s "$TEMP_FILE" 2>/dev/null || echo "0")
-
-        if [ "$file_size" -lt "$MIN_FILE_SIZE" ]; then
-          log "Downloaded file is too small (${file_size} bytes < ${MIN_FILE_SIZE} bytes)"
+        local size
+        size=$(stat -c%s "${TEMP_FILE}" 2>/dev/null || stat -f%z "${TEMP_FILE}" 2>/dev/null || echo 0)
+        if (( size < MIN_FILE_SIZE )); then
+          info "File too small: ${size} bytes."
         else
-          log "Downloaded file validated (${file_size} bytes)"
+          info "Download validated: ${size} bytes."
           return 0
         fi
       fi
-    else
-      log "curl command failed with exit code $?"
     fi
 
-    # Retry with exponential backoff
-    if [ $attempt -lt $MAX_RETRIES ]; then
+    if (( attempt < MAX_RETRIES )); then
       local delay=$((RETRY_DELAY * attempt))
-      log "Retrying in ${delay} seconds..."
-      sleep "$delay"
+      info "Retrying in ${delay} seconds..."
+      sleep "${delay}"
     fi
-
-    ((attempt++))
+    (( attempt++ ))
   done
 
   return 1
 }
 
-# @description Calculate target dates for filter download
-# @stdout Prints CURRENT_MONTH and NEXT_MONTH in YYYYMM format
-# @exitcode None
-calculate_target_dates() {
-  # ARM Optimization: Call date command only once to reduce overhead
-  local current_date
-  current_date=$(date +%Y%m%d)
-
-  # Extract current month (YYYYMM)
-  CURRENT_MONTH="${current_date:0:6}"
-
-  # Calculate next month (handles year rollover correctly)
-  NEXT_MONTH=$(date -d "${current_date:0:6}01 +1 month" "+%Y%m" 2>/dev/null || \
-                date -v+1m -j -f "%Y%m%d" "${current_date:0:6}01" "+%Y%m" 2>/dev/null)
+# @description Safely calculate current and next month in YYYYMM format
+calculate_dates() {
+  # Note: Use day 01 to avoid '+1 month' bug on 31st
+  local today_01
+  today_01=$(date +%Y-%m-01)
+  
+  CURRENT_MONTH=$(date -d "${today_01}" +%Y%m)
+  # Compatibility: GNU date (Linux) vs BSD date (macOS)
+  NEXT_MONTH=$(date -d "${today_01} +1 month" +%Y%m 2>/dev/null || \
+                date -v+1m -f "%Y-%m-%d" "${today_01}" +%Y%m 2>/dev/null)
 }
 
-# --- Argument Parsing ---
+usage() {
+  cat <<EOF >&2
+Usage: ${0##*/} [-v] [-h]
+
+Options:
+  -v    Verbose mode
+  -h    Show help
+EOF
+  exit 1
+}
+
+# --- Main ---
+
 while getopts "vh" opt; do
-  case ${opt} in
+  case "${opt}" in
     v) VERBOSE=1 ;;
     h) usage ;;
     *) usage ;;
   esac
 done
 
-# --- Main Logic ---
+# Prepare environment
+calculate_dates
+TEMP_FILE=$(mktemp)
+readonly TEMP_FILE
 
-log "AdGuard Home 280blocker Updater starting"
-log "Data directory: ${DATA_DIR}"
-log "Target file: ${SAVE_PATH}"
+info "Starting update process..."
 
-# Calculate target dates
-calculate_target_dates
-log "Current month: ${CURRENT_MONTH}"
-log "Next month: ${NEXT_MONTH}"
-
-# Create data directory if missing
-if [ ! -d "$DATA_DIR" ]; then
-  log "Creating data directory: ${DATA_DIR}"
-  mkdir -p "$DATA_DIR"
-fi
-
-# Download filter list (try next month first, fallback to current month)
-if download_list "$NEXT_MONTH"; then
-  log "Successfully downloaded next month's list (${NEXT_MONTH})"
-elif download_list "$CURRENT_MONTH"; then
-  log "Next month not available. Using current month's list (${CURRENT_MONTH})"
+# 1. Download (Try Next Month, then Current Month)
+if download_filter "${NEXT_MONTH}"; then
+  info "Target: Next Month (${NEXT_MONTH})"
+elif download_filter "${CURRENT_MONTH}"; then
+  info "Target: Current Month (${CURRENT_MONTH})"
 else
-  error "Failed to download filter list. Neither ${NEXT_MONTH} nor ${CURRENT_MONTH} were available."
-  error "Please check network connectivity and 280blocker.net availability."
+  err "Failed to download any valid filter list from 280blocker.net."
   exit 1
 fi
 
-# Change detection: Skip write if content is identical (I/O optimization for SD cards)
-if [ -f "$SAVE_PATH" ] && cmp -s "$TEMP_FILE" "$SAVE_PATH"; then
-  log "No changes detected. Skipping update."
-  log_success "Filter list is up to date"
+# 2. Change Detection (SD Card Protection)
+if [[ -f "${SAVE_PATH}" ]] && cmp -s "${TEMP_FILE}" "${SAVE_PATH}"; then
+  log_success "No changes detected. Skipping I/O operations."
   exit 0
 fi
 
-# Atomic file update with proper permissions
-log "Updating filter list at ${SAVE_PATH}"
-
-# Flexible permission handling: root vs non-root
-if [ "$(id -u)" -eq 0 ]; then
-  # Running as root: Set explicit ownership
-  install -m 644 -o root -g root "$TEMP_FILE" "$SAVE_PATH"
-  log "Installed with root ownership"
-else
-  # Running as non-root: Use current user's permissions
-  install -m 644 "$TEMP_FILE" "$SAVE_PATH"
-  log "Installed with current user ownership"
+# 3. Directory Management
+if [[ ! -d "${DATA_DIR}" ]]; then
+  info "Creating directory: ${DATA_DIR}"
+  mkdir -p "${DATA_DIR}"
 fi
 
-log_success "Filter list updated successfully"
+# 4. Atomic Update
+info "Applying update to ${SAVE_PATH}"
+if [[ "$(id -u)" -eq 0 ]]; then
+  # Root: Ensure correct ownership for AGH
+  install -m 644 -o root -g root "${TEMP_FILE}" "${SAVE_PATH}"
+else
+  # Non-root: Standard install
+  install -m 644 "${TEMP_FILE}" "${SAVE_PATH}"
+fi
 
-# Success: Silent exit (UNIX philosophy - silence is golden)
+log_success "Filter list updated successfully."
 exit 0
