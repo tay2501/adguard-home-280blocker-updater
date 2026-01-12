@@ -1,6 +1,8 @@
 services:
   # Systemdテスト用の仮想ラボ
   lab:
+    environment:
+      TZ: Asia/Tokyo
     build:
       context: .
       dockerfile: Dockerfile

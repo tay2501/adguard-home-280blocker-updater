@@ -1,13 +1,22 @@
 [Unit]
 Description=AdGuard Home 280blocker Filter Updater
 Documentation=https://github.com/yourusername/adguard-home-280blocker-updater
-After=network-online.target
+After=network-online.target nss-lookup.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
 User=root
 Group=root
+# メモリ上での実行コードの書き換えを禁止（セキュリティの鉄板設定）
+MemoryDenyWriteExecute=yes
+
+# 新しいプロセスの生成を制限（必要最小限のフォークのみ許可）
+# スクリプトが外部コマンドを呼ぶため、基本は不要ですが、より厳格にするなら
+# RestrictRealtime=yes
+
+# 特権（SUID/SGID）の利用を制限
+RestrictSUIDSGID=true
 
 # 1. 【修正】ファイル名を 'updater' に統一 (必須)
 ExecStart=/usr/local/bin/adguardhome-280blocker-filter-updater
@@ -43,7 +52,7 @@ RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
 # システムコール制限
 # シェルスクリプト(bash, curl, sed等)が使うコールを許可
-SystemCallFilter=@system-service @file-system @network-io
+SystemCallFilter=@system-service @file-system @network-io @signal
 SystemCallErrorNumber=EPERM
 
 # 特権の制限 (rootでも不要な権限は捨てる)

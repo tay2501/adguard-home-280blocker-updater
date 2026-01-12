@@ -3,11 +3,15 @@ Description=AdGuard Home 280blocker Filter Update Timer
 # Documentationはあっても良いですが、Requires行は削除します
 
 [Timer]
-# 1. 実行スケジュール: 毎日 AM 03:00
+# 1. 実行スケジュール: 毎月 AM 03:00
 # (daily と書くと 00:00 にも実行される可能性があるため、これ1行に絞ります)
-OnCalendar=*-*-* 03:00:00
+OnCalendar=*-*-01 03:00:00
 
-# 2. 負荷分散 (重要): 
+# 実行精度の許容範囲を2時間にする（デフォルトは1分）
+# これにより、システムは他のタスクと同じタイミングでCPUをスリープから復帰させ、効率化します。
+AccuracySec=2h
+
+# 2. 負荷分散: 
 # サーバー（280blocker等）へのアクセス集中を防ぐため、開始時間を0〜5分ランダムにずらします。
 # これはこの手の自動スクリプトにおける「マナー」であり、デファクトスタンダードです。
 RandomizedDelaySec=300
@@ -16,7 +20,7 @@ RandomizedDelaySec=300
 # スケジュール時刻にPCが電源OFFだった場合、次回起動時に即実行します。
 Persistent=true
 
-# 【重要】Unit行は削除します
+# Unit行は削除します
 # ファイル名が "foo.timer" なら、Systemdは自動的に "foo.service" を探します。
 # 明示的に書くことで発生するTypoや不整合のリスクを避けるのがベストプラクティスです。
 
