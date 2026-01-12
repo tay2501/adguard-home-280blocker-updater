@@ -1,6 +1,6 @@
 # プロジェクト憲法 (Project Constitution) - Shell/Bash Edition
 
-## 🛠 技術スタック & 環境 (Immutable)
+## 技術スタック & 環境 (Immutable)
 
 - **言語**: Bash (Version 4.0+ 推奨, macOS互換が必要な場合は 3.2+)
 - **スタイルガイド**: [Google Shell Style Guide](https://google.github.io/styleguide/shellguide.html) 準拠
@@ -82,5 +82,6 @@ AIは以下の「思考と行動のループ」を厳守し、単発の回答で
 - **Systemdインストール**: `docker compose exec lab make install-systemd`
 - **Cronインストール**: `docker compose exec lab make install-cron`
 - **アンインストール**: `docker compose exec lab make uninstall`
+- **手動実行**: `docker compose exec lab systemctl start adguardhome-280blocker-filter-updater.service`
+- **手動実行結果確認**: `docker compose exec lab journalctl -u adguardhome-280blocker-filter-updater.service --no-pager`
 - **ラボ破棄**: `docker compose down`
-- 

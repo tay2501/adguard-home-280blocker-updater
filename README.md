@@ -38,11 +38,11 @@ AdGuard Home用の280blockerフィルタリストを自動更新するシェル�
 
 ```bash
 # リポジトリのクローン
-git clone https://github.com/yourusername/adguard-home-280blocker-updater.git
+git clone https://github.com/tay2501/adguard-home-280blocker-updater.git
 cd adguard-home-280blocker-updater
 
 # /usr/local/bin にスクリプトをインストール + cron設定
-sudo make install
+sudo make install-cron
 
 # または systemd timer を使用する場合（推奨: モダンなLinux）
 sudo make install-systemd
@@ -162,19 +162,53 @@ adguardhome-280blocker-filter-updater -v
 
 スクリプトのインストールが完了したら、AdGuard Homeにフィルタを登録します:
 
-1. AdGuard Homeの管理画面にログイン
-2. **フィルタ** → **DNS遮断リスト** → **カスタムフィルタを追加**
-3. 以下を設定:
-   - **名前**: `280blocker Domain List`
-   - **URL**: `file:///var/opt/adguardhome/filters/280blocker_domain_ag.txt`
-4. 保存後、フィルタリストを更新
+1. AdGuard Homeを停止
+
+```Bash
+sudo systemctl stop AdGuardHome
+```
+
+2. 設定ファイルを編集
+
+  ```/opt/AdGuardHome/AdGuardHome.yaml
+  filtering:
+    # ...
+    safe_fs_patterns:
+      - /opt/AdGuardHome/userfilters/*    # 初期設定
+      - /var/opt/adguardhome/filters/*    # ★追加箇所
+  ```
+
+3. AdGuard Homeを再起動
+   
+  ```Bash
+  sudo systemctl restart AdGuardHome
+  ```
+
+4. AdGuard Homeの管理画面にログイン
+5. **フィルタ** → **DNS遮断リスト** → **カスタムフィルタを追加**
+6. 以下を設定:
+    - **名前**: `280blocker Domain List`
+    - **URL**: `/var/opt/adguardhome/filters/280blocker_domain_ag.txt`
+7. 保存後、フィルタリストを更新
 
 ### 初回実行
 
 AdGuard Home設定前に、一度手動でスクリプトを実行してフィルタファイルを作成します:
 
+1. 手動実行
+
 ```bash
-sudo adguardhome-280blocker-filter-updater -v
+sudo systemctl start adguardhome-280blocker-filter-updater.service
+```
+
+2. 結果確認
+
+```bash
+# 実行ログを見る
+journalctl -u adguardhome-280blocker-filter-updater.service -n 20 --no-pager
+
+# ファイルが生成されたか確認
+ls -l /var/opt/adguardhome/filters/
 ```
 
 ## 🔍 Troubleshooting

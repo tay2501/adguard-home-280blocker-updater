@@ -31,8 +31,7 @@ ProtectHome=true
 # ReadWritePaths=/opt/AdGuardHome/data/filters
 # Webサーバー公開ディレクトリに置く場合:
 # ReadWritePaths=/var/www/html
-# (一旦コメントアウトしますが、実装時に必要に応じて有効化してください)
-# ReadWritePaths=/var/opt/adguardhome/filters
+ReadWritePaths=/var/opt/adguardhome/filters
 
 # カーネル保護
 ProtectKernelTunables=true
@@ -40,7 +39,7 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 
 # ネットワーク制限 (IPv4/IPv6のみ許可)
-RestrictAddressFamilies=AF_INET AF_INET6
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
 # システムコール制限
 # シェルスクリプト(bash, curl, sed等)が使うコールを許可
